@@ -1,0 +1,86 @@
+blueprint:
+  name: Motion-Activated Heating
+  description: Turn up heating when motion is detected.
+  domain: automation
+  input:
+    motion_entity:
+      name: Motion Sensor
+      selector:
+        entity:
+          domain: binary_sensor
+          device_class: motion
+    climate_target:
+      name: Climate Device
+      selector:
+        target:
+    eco_temperature:
+      name: Eco Temperature
+      description: Fallback temperature when no motion is detected
+      selector:
+        number:
+          min: 0
+          max: 100
+          unit_of_measurement: fahrenheit
+    comfort_temperature:
+      name: Comfort Temperature
+      description: Comfort temperature when motion is detected
+      selector:
+        number:
+          min: 0
+          max: 100
+          unit_of_measurement: fahrenheit
+    time_after:
+      name: Time After
+      description: Point from which the motion will control eco heating
+      default: '07:00:00'
+      selector:
+        time: {}
+    time_before:
+      name: Time Before
+      description: Point from which the motion will not trigger eco heating
+      default: '23:30:00'
+      selector:
+        time: {}
+    no_motion_wait:
+      name: Hold time
+      description: Time to leave the heating in comfort for after last motion is detected.
+      default: 600
+      selector:
+        number:
+          min: 0
+          max: 3600
+          unit_of_measurement: seconds
+        
+
+# If motion is detected within the delay,
+# we restart the script.
+mode: restart
+max_exceeded: silent
+
+trigger:
+  platform: state
+  entity_id: !input motion_entity
+  from: "off"
+  to: "on"
+
+action:
+  - condition: time
+    before: !input time_before
+    after: !input time_after
+  - service: climate.set_temperature
+    data:
+      hvac_mode: heat
+      temperature: !input comfort_temperature
+    target: !input climate_target
+    #target: !input climate_target
+  - wait_for_trigger:
+      platform: state
+      entity_id: !input motion_entity
+      from: "on"
+      to: "off"
+  - delay: !input no_motion_wait
+  - service: climate.set_temperature
+    data:
+      hvac_mode: heat
+      temperature: !input eco_temperature
+    target: !input climate_target
